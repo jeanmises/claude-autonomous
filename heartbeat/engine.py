@@ -12,13 +12,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any
 
-# Add router to path
+# Add router and sandbox to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "router"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "sandbox"))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from risk_scorer import calculate_risk_score
 from decision_engine import make_decision, ActionType
 from approval_parser import parse_pending_approvals
+from orchestrator import SandboxOrchestrator
 
 
 # Paths
@@ -136,24 +138,48 @@ class HeartbeatEngine:
         action, decision = make_decision(task, self.profile)
         self.log(f"  Decision: {action.value}")
 
-        # Update stats
+        # Execute via sandbox if not dry-run
+        sandbox_score = None
+        sandbox_success = False
+
+        if not self.dry_run and action in [ActionType.AUTO_EXECUTE, ActionType.CONDITIONAL_EXECUTE]:
+            # Run sandbox test
+            self.log(f"  Running sandbox test...", "INFO")
+
+            try:
+                target_score = decision.get("sandbox_threshold", 95)
+                orchestrator = SandboxOrchestrator(task, max_iterations=5, target_score=target_score)
+                sandbox_success, sandbox_score, sandbox_result = orchestrator.run()
+
+                self.log(f"  Sandbox result: score={sandbox_score}/100, success={sandbox_success}", "INFO")
+            except Exception as e:
+                self.log(f"  Sandbox error: {e}", "ERROR")
+                sandbox_score = 0
+                sandbox_success = False
+
+        # Update stats based on action and sandbox result
         if action == ActionType.AUTO_EXECUTE:
-            self.stats["executed"] += 1
             if self.dry_run:
-                self.log(f"  [DRY-RUN] Would auto-execute task {task_id}", "INFO")
-            else:
-                self.log(f"  Delegating to sandbox executor...", "INFO")
-                # TODO: Call sandbox executor in Week 2
-        elif action == ActionType.CONDITIONAL_EXECUTE:
-            if decision.get("sandbox_threshold_met"):
                 self.stats["executed"] += 1
-                if self.dry_run:
-                    self.log(f"  [DRY-RUN] Would conditionally execute (threshold met)", "INFO")
-                else:
-                    self.log(f"  Delegating to sandbox executor...", "INFO")
+                self.log(f"  [DRY-RUN] Would auto-execute task {task_id}", "INFO")
+            elif sandbox_success:
+                self.stats["executed"] += 1
+                self.log(f"  ✓ Task executed successfully (score: {sandbox_score}/100)", "INFO")
+            else:
+                self.stats["failed"] += 1
+                self.log(f"  ✗ Task failed sandbox test (score: {sandbox_score}/100)", "WARN")
+
+        elif action == ActionType.CONDITIONAL_EXECUTE:
+            if self.dry_run:
+                self.log(f"  [DRY-RUN] Would test in sandbox (threshold: {decision['sandbox_threshold']})", "INFO")
+                self.stats["escalated"] += 1
+            elif sandbox_success and sandbox_score >= decision["sandbox_threshold"]:
+                self.stats["executed"] += 1
+                self.log(f"  ✓ Task executed (score {sandbox_score} >= threshold {decision['sandbox_threshold']})", "INFO")
             else:
                 self.stats["escalated"] += 1
-                self.log(f"  Escalating to human (sandbox threshold not met)", "WARN")
+                self.log(f"  Escalating to human (score {sandbox_score} < threshold {decision['sandbox_threshold']})", "WARN")
+
         elif action == ActionType.ESCALATE_HUMAN:
             self.stats["escalated"] += 1
             self.log(f"  Escalating to human approval", "WARN")
@@ -163,9 +189,9 @@ class HeartbeatEngine:
 
         # Record in metrics DB
         if not self.dry_run:
-            self._record_metrics(task, risk_score, risk_level.value, decision)
+            self._record_metrics(task, risk_score, risk_level.value, decision, sandbox_score)
 
-    def _record_metrics(self, task: Dict[str, Any], risk_score: int, risk_level: str, decision: Dict[str, Any]):
+    def _record_metrics(self, task: Dict[str, Any], risk_score: int, risk_level: str, decision: Dict[str, Any], sandbox_score: int = None):
         """Record execution metrics to database."""
 
         conn = sqlite3.connect(str(METRICS_DB))
@@ -173,14 +199,15 @@ class HeartbeatEngine:
 
         cursor.execute("""
             INSERT INTO execution_metrics (
-                task_id, task_type, risk_level, risk_score,
+                task_id, task_type, risk_level, risk_score, sandbox_score,
                 status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             task.get("task_id"),
             task.get("action_type"),
             risk_level,
             risk_score,
+            sandbox_score,
             decision["action"],
             datetime.now().isoformat()
         ))
@@ -267,7 +294,8 @@ class HeartbeatEngine:
 
 
 if __name__ == "__main__":
-    dry_run = "--dry-run" not in sys.argv or "--live" not in sys.argv
+    # Default is dry-run mode; use --live to execute for real
+    dry_run = "--live" not in sys.argv
     run_once = "--run-once" in sys.argv
     verbose = "--verbose" in sys.argv
 
