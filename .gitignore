@@ -37,7 +37,9 @@ metrics.db-journal
 KILL_SWITCH
 logs/
 sandbox/environments/*/
+snapshots/
 *.log
+rollbacks.log
 
 # Sensitive Data
 *.key
