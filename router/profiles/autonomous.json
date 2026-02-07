@@ -1,0 +1,40 @@
+{
+  "profile_name": "autonomous",
+  "description": "Full autonomous mode - auto-execution for LOW/MEDIUM risk tasks",
+  "version": "1.0",
+  "rules": {
+    "LOW": {
+      "action": "auto_execute",
+      "require_sandbox": true,
+      "sandbox_threshold": 95,
+      "notification": "post_execution",
+      "description": "Auto-execute immediately after successful sandbox validation"
+    },
+    "MEDIUM": {
+      "action": "conditional_execute",
+      "conditions": [
+        "sandbox_test_passed",
+        "score_above_threshold:90"
+      ],
+      "require_sandbox": true,
+      "sandbox_threshold": 90,
+      "notification": "immediate",
+      "description": "Auto-execute only if sandbox score ≥90/100"
+    },
+    "HIGH": {
+      "action": "escalate_human",
+      "notification": "immediate",
+      "description": "Requires human approval before execution"
+    },
+    "CRITICAL": {
+      "action": "block",
+      "notification": "immediate",
+      "description": "Blocked - Manual review mandatory"
+    }
+  },
+  "limits": {
+    "max_concurrent_tasks": 3,
+    "max_sandbox_iterations": 5,
+    "execution_timeout_seconds": 600
+  }
+}
