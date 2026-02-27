@@ -4,6 +4,7 @@ Autonomous System - Production Executor
 Safe production execution with automatic rollback on failure.
 """
 
+import os
 import time
 import sys
 from pathlib import Path
@@ -20,7 +21,7 @@ from validation.pre_flight import PreFlightValidator
 from validation.post_flight import PostFlightValidator
 
 # Workspace path
-WORKSPACE_ROOT = Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace"
+WORKSPACE_ROOT = Path(os.environ.get("CW_ROOT", str(Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace")))
 LOCAL_VAULT_DB = WORKSPACE_ROOT / "local_vault.db"
 
 

@@ -5,6 +5,7 @@ Main orchestrator for autonomous task execution cycles.
 """
 
 import json
+import os
 import sqlite3
 import sys
 import uuid
@@ -24,7 +25,7 @@ from orchestrator import SandboxOrchestrator
 
 
 # Paths
-WORKSPACE_ROOT = Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace"
+WORKSPACE_ROOT = Path(os.environ.get("CW_ROOT", str(Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace")))
 PENDING_APPROVAL = WORKSPACE_ROOT / "PENDING_APPROVAL.md"
 LOCAL_VAULT_DB = WORKSPACE_ROOT / "local_vault.db"
 METRICS_DB = Path.home() / ".claude" / "autonomous" / "metrics.db"

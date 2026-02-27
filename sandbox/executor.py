@@ -16,7 +16,7 @@ from typing import Dict, Any, Tuple, Optional
 
 # Paths
 SANDBOX_ROOT = Path.home() / ".claude" / "autonomous" / "sandbox" / "environments"
-WORKSPACE_ROOT = Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace"
+WORKSPACE_ROOT = Path(os.environ.get("CW_ROOT", str(Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace")))
 LOCAL_VAULT_DB = WORKSPACE_ROOT / "local_vault.db"
 
 

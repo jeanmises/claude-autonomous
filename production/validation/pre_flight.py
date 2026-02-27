@@ -4,6 +4,7 @@ Autonomous System - Pre-flight Validation
 Checks system readiness before production execution.
 """
 
+import os
 import sqlite3
 import shutil
 from pathlib import Path
@@ -11,7 +12,7 @@ from typing import Dict, Any, Tuple, List
 
 
 # Paths
-WORKSPACE_ROOT = Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace"
+WORKSPACE_ROOT = Path(os.environ.get("CW_ROOT", str(Path.home() / "Library" / "CloudStorage" / "OneDrive-SAPASPA" / "OD PARA Sales Strategy" / "Claude Workspace")))
 LOCAL_VAULT_DB = WORKSPACE_ROOT / "local_vault.db"
 
 
